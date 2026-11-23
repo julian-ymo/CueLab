@@ -1,0 +1,51 @@
+name: Build Windows app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Every build gets a higher version number, so a new installer
+      # always installs over the old one (no uninstall needed).
+      - name: Set version
+        shell: bash
+        run: npm version "1.0.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build installer + portable exe
+        run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: CueLab-Windows-1.0.${{ github.run_number }}
+          path: |
+            dist/*.exe
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: CueLab 1.0.${{ github.run_number }}
+          body: |
+            **Download `CueLab-Setup-1.0.${{ github.run_number }}.exe`** and run it. It installs over any older version — your progress is kept.
+            `CueLab-Portable-…exe` runs without installing.
+            First run: if Windows shows "Windows protected your PC", click **More info → Run anyway** (the app isn't code-signed yet).
+          files: dist/*.exe
