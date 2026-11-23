@@ -32,7 +32,7 @@
   };
   CL.currentView = () => currentName;
 
-  const NAV = [['home', 'Home'], ['lessons', 'Lessons'], ['studio', 'Practice Studio'], ['library', 'Music Library'], ['flx4', 'DDJ-FLX4'], ['study', 'Study Mode']];
+  const NAV = [['home', 'Home'], ['lessons', 'Lessons'], ['studio', 'Practice Studio'], ['library', 'Music Library'], ['flx4', 'DDJ-FLX4'], ['study', 'Study Mode'], ['settings', 'Settings']];
   function renderSide() {
     const side = $('#side');
     const M = CL.midi || {};
@@ -40,11 +40,13 @@
     const active = currentName === 'lesson' ? 'lessons' : currentName;
     side.innerHTML = `<div class="logo"><div class="logo-mark"><span></span></div><b>CueLab</b></div>` +
       NAV.map(([id, label]) => `<button class="nav${active === id ? ' on' : ''}" data-go="${id}">${label}</button>`).join('') +
-      `<div class="side-status${ok ? ' ok' : ''}" data-go="flx4">
+      `<div class="langsw notr">${[['en', 'English'], ['my', 'မြန်မာ']].map(([k, n]) => `<button class="${CL.lang() === k ? 'on' : ''}" data-lang="${k}">${n}</button>`).join('')}</div>
+      <div class="side-status${ok ? ' ok' : ''}" data-go="flx4">
         <span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><span class="dot ${ok ? 'ok' : M.status === 'searching' ? 'warn' : 'bad'}"></span>${ok ? CL.esc(M.isFlx4 ? 'DDJ-FLX4 connected' : M.name) : 'No controller'}</span>
         <span class="small">${ok ? 'USB MIDI' + (CL.audio && CL.audio.fourCh ? ' + audio' : '') : 'Plug in your DDJ-FLX4 by USB'}</span>
       </div>`;
     side.querySelectorAll('[data-go]').forEach(b => b.onclick = () => CL.go(b.dataset.go));
+    side.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { if (b.dataset.lang !== CL.lang()) CL.setLang(b.dataset.lang); });
   }
   CL.renderSide = renderSide;
   CL.on('midi-status', renderSide);

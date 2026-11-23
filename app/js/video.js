@@ -7,18 +7,22 @@
   const V = CL.voice = { voice: null, ready: false };
   function pickVoice() {
     if (!window.speechSynthesis) return;
-    const vs = speechSynthesis.getVoices().filter(v => v.localService !== false && /^en/i.test(v.lang));
+    const all = speechSynthesis.getVoices().filter(v => v.localService !== false);
+    if (CL.lang() === 'my') { V.voice = all.find(v => /^my/i.test(v.lang) || /burmese|myanmar/i.test(v.name)) || null; V.ready = true; return; }
+    const vs = all.filter(v => /^en/i.test(v.lang));
     V.voice = vs.find(v => /aria|jenny|zira|natural/i.test(v.name)) || vs.find(v => /david|mark|guy/i.test(v.name)) || vs[0] || null;
     V.ready = true;
   }
   if (window.speechSynthesis) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
   V.available = () => !!(window.speechSynthesis && V.voice);
   V.say = function (text, rate, enabled) {
-    const est = Math.max(1200, text.split(/\s+/).length / 2.7 * 1000 / (rate || 1));
+    text = CL.t(text);
+    // reading time: about 2.7 words a second in English; Burmese has few spaces, so count letters instead
+    const est = Math.max(1200, (CL.lang() === 'my' ? text.length / 11 : text.split(/\s+/).length / 2.7) * 1000 / (rate || 1));
     if (!enabled || !V.available()) return { done: new Promise(r => setTimeout(r, est)), est };
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.voice = V.voice; u.rate = 0.98 * (rate || 1); u.pitch = 1; u.volume = 1;
+    u.voice = V.voice; u.lang = V.voice.lang; u.rate = 0.98 * (rate || 1); u.pitch = 1; u.volume = 1;
     const done = new Promise(r => { let ok = false; const fin = () => { if (!ok) { ok = true; r(); } }; u.onend = fin; u.onerror = fin; setTimeout(fin, est * 2.5 + 3000); });
     speechSynthesis.speak(u);
     return { done, est };

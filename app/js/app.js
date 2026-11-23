@@ -14,6 +14,8 @@
     if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
     if (e.code === 'Space') { e.preventDefault(); CL.input('d1play', true, 'mouse'); CL.input('d1play', false, 'mouse'); }
   });
-  CL.go('home');
+  CL.i18n.start();
+  let after = null; try { after = sessionStorage.getItem('cuelab.after'); sessionStorage.removeItem('cuelab.after'); } catch (e) { }
+  CL.go(after && CL.views[after] ? after : 'home');
   window.CueLab = CL; // handy for testing in dev tools
 })(window.CL);

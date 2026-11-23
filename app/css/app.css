@@ -7,8 +7,8 @@
   --pink: #FF5FA2; --pink-bg: #2A1621; --pink-line: #6B2A4A; --pink-text: #FF8FBF;
   --green: #5BD68A; --green-bg: #14281D; --green-line: #1F4A30;
   --orange: #FF9F2E; --violet: #8C7CF5;
-  --display: 'Bahnschrift', 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif;
-  --ui: 'Segoe UI', 'Segoe UI Variable Text', system-ui, -apple-system, sans-serif;
+  --display: 'Bahnschrift', 'Segoe UI Semibold', 'Segoe UI', 'Myanmar Text', 'Pyidaungsu', 'Padauk', 'Noto Sans Myanmar', system-ui, sans-serif;
+  --ui: 'Segoe UI', 'Segoe UI Variable Text', 'Myanmar Text', 'Pyidaungsu', 'Padauk', 'Noto Sans Myanmar', system-ui, -apple-system, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--text); font-family: var(--ui); -webkit-font-smoothing: antialiased; user-select: none; }
@@ -147,3 +147,19 @@ select.inp, input.inp { height: 40px; border-radius: 10px; border: 1px solid var
 @keyframes vturn { 25% { transform: rotate(-20deg); } 75% { transform: rotate(20deg); } }
 @keyframes vcircle { 0% { transform: translate(0,0); } 25% { transform: translate(16px,-10px); } 50% { transform: translate(0,-22px); } 75% { transform: translate(-16px,-10px); } 100% { transform: translate(0,0); } }
 .vhand svg { display: block; }
+
+/* language switch + settings */
+.langsw { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-top: auto; margin-bottom: 8px; }
+.langsw button { flex: 1; height: 32px; border: none; border-radius: 7px; background: none; color: var(--dim2); font-size: 13px; font-weight: 600; font-family: var(--ui); }
+.langsw button.on { background: var(--cyan); color: #0E0F13; }
+.langsw + .side-status { margin-top: 0; }
+.langcard { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px; border-radius: 14px; background: var(--card2); border: 2px solid var(--line2); color: var(--text); text-align: left; font-family: var(--ui); }
+.langcard.on { border-color: var(--cyan); }
+/* Burmese script is taller: give lines more room and keep long words inside their boxes */
+html[lang=my] body { line-height: 1.55; }
+html[lang=my] .txt, html[lang=my] .small, html[lang=my] .sub { line-height: 1.6; }
+html[lang=my] h1 { font-size: 30px; line-height: 1.4; }
+html[lang=my] .big { line-height: 1.4; }
+html[lang=my] .kicker { letter-spacing: 0; }
+html[lang=my] .btn, html[lang=my] .nav { line-height: 1.3; }
+.langcard .chip { border: 1px solid var(--line2); }

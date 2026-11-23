@@ -94,7 +94,7 @@ window.CL = window.CL || {};
     streakDays: [],     // list of yyyy-mm-dd
     xp: 0,
     studySessions: 0,
-    settings: { jogFeel: 1, invertTempo: false, sinkId: '', cueToOut34: true, studyFocus: 25, studyBreak: 5, studyVolume: 0.7 },
+    settings: { jogFeel: 1, invertTempo: false, sinkId: '', cueToOut34: true, studyFocus: 25, studyBreak: 5, studyVolume: 0.7, lang: 'en' },
     learned: {}         // learned MIDI: "status:data1" -> controlId
   };
   function load() {

@@ -122,7 +122,7 @@
         <label class="col" style="gap:6px;font-size:12px;color:var(--dim)">Search<input class="inp q" placeholder="Title, genre, BPM, key…" style="width:280px"></label>
         <button class="btn primary imp">+ Add your music</button><input type="file" class="file" accept="audio/*" multiple style="display:none"></div></div>`);
     main.appendChild(head);
-    main.appendChild(h(`<div class="card cyan" style="flex-direction:row;align-items:center;gap:12px;padding:12px 16px"><span class="dot ok"></span><span class="txt" style="color:var(--dim2)">On your FLX4: turn <b>BROWSE</b> to move through this list, then press <b>LOAD 1</b> or <b>LOAD 2</b>. Export any practice track as a WAV file to use it in rekordbox or Serato too.</span></div>`));
+    main.appendChild(h(`<div class="card cyan" style="flex-direction:row;align-items:center;gap:12px;padding:12px 16px"><span class="dot ok"></span><span class="txt" style="color:var(--dim2)">On your FLX4: turn BROWSE to move through this list, then press LOAD 1 or LOAD 2. Export any practice track as a WAV file to use it in rekordbox or Serato too.</span></div>`));
     const chips = h(`<div style="display:flex;gap:8px;flex-wrap:wrap"></div>`); main.appendChild(chips);
     const box = h(`<div class="card" style="flex:1 1 0;min-height:0;padding:8px 18px 12px"><div class="trow" style="grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1fr) 70px 60px 70px 90px 220px;border-top:none;color:var(--dim);font-size:12px"><span>Title</span><span>Artist / source</span><span>Genre</span><span>BPM</span><span>Key</span><span>Length</span><span>License</span><span>Load / export</span></div><div class="rows scroll" style="flex:1 1 0;min-height:0;display:flex;flex-direction:column"></div></div>`);
     main.appendChild(box);
@@ -183,7 +183,7 @@
       <label style="display:flex;gap:10px;align-items:center;font-size:13px">Jog wheel feel <input type="range" class="jf" min="0.5" max="2" step="0.1" style="flex:1"><span class="jfv small" style="width:40px"></span></label>
       <div style="display:flex;gap:8px"><button class="btn sm ts">Test speakers</button><button class="btn sm th">Test headphones</button></div>
       <span class="small rt"></span>
-      <div class="q4 card amber" style="display:none;padding:12px 14px;gap:6px"><b style="color:#FFD08A;font-size:13px">Headphone cue needs 4 channels</b><span style="font-size:12px;color:#E8D9BC;line-height:1.5">Windows is giving CueLab only 2 channels of your FLX4, so cue can't reach the headphone jack. Fix: Windows <b>Sound settings → More sound settings → Playback</b> → right-click <b>Speakers (DDJ-FLX4)</b> → <b>Configure</b> → choose <b>Quadraphonic</b> → Next → Finish. Then restart CueLab.</span></div></div>`);
+      <div class="q4 card amber" style="display:none;padding:12px 14px;gap:6px"><b style="color:#FFD08A;font-size:13px">Headphone cue needs 4 channels</b><span style="font-size:12px;color:#E8D9BC;line-height:1.5">Windows is giving CueLab only 2 channels of your FLX4, so cue can't reach the headphone jack. Fix: Windows Sound settings → More sound settings → Playback → right-click Speakers (DDJ-FLX4) → Configure → choose Quadraphonic → Next → Finish. Then restart CueLab.</span></div></div>`);
     right.appendChild(audio);
     const tools = h(`<div class="card"><h3>Also use with your DJ software</h3><span class="txt" style="font-size:13px">Export practice tracks as WAV files from the Music Library and add them to rekordbox or Serato. Close CueLab before opening another DJ app, so the FLX4 isn't shared by two apps.</span><div style="display:flex;gap:8px"><button class="btn sm rescan">Rescan USB</button><button class="btn sm forget">Forget learned controls</button></div></div>`);
     right.appendChild(tools);
@@ -327,5 +327,28 @@
       step();
     }
   };
+  // ======================= SETTINGS =======================
+  CL.views.settings = function (main) {
+    const cur = CL.lang();
+    main.appendChild(h(`<div class="col" style="gap:6px"><h1>Settings</h1><span class="sub">Choose the app language and how lessons talk to you.</span></div>`));
+    const body = h(`<div class="row grow" style="align-items:flex-start"><div class="col" style="flex:1.3"></div><div class="col" style="flex:1"></div></div>`);
+    main.appendChild(body);
+    const [left, right] = body.children;
+    const card = h(`<div class="card"><h3>Language</h3><span class="txt">Lessons, buttons, help and captions change language. Labels printed on your FLX4 (PLAY/PAUSE, CUE, LOW, BEAT SYNC…) stay in English so they match the controller.</span><div class="row langcards"></div></div>`);
+    left.appendChild(card);
+    const opts = [['en', 'English', 'English'], ['my', 'မြန်မာ', 'Burmese']];
+    const box = card.querySelector('.langcards');
+    opts.forEach(([k, name, en]) => {
+      const b = h(`<button class="langcard${cur === k ? ' on' : ''}"><span class="big notr" style="font-size:30px">${name}</span><span class="small notr">${en}</span><span class="chip${cur === k ? ' on' : ''}">${cur === k ? 'In use' : 'Use this language'}</span></button>`);
+      b.onclick = () => { if (k !== CL.lang()) CL.setLang(k); };
+      box.appendChild(b);
+    });
+    left.appendChild(h(`<div class="card"><h3>Lesson videos</h3><span class="txt">${cur === 'my'
+      ? 'Windows has no built-in Burmese voice, so videos show Burmese captions. If you add a Burmese voice to Windows, CueLab will use it.'
+      : 'The voice uses Windows\' built-in speech, so it works offline. Captions are always available.'}</span></div>`));
+    right.appendChild(h(`<div class="card"><h3>Controller and sound</h3><span class="txt">Output device, headphone cue, tempo direction and jog wheel feel are on the DDJ-FLX4 page.</span><button class="btn" data-go="flx4" style="align-self:flex-start">Open DDJ-FLX4 settings</button></div>`));
+    right.querySelector('[data-go]').onclick = () => CL.go('flx4');
+  };
+
   CL.autoMix = autoMix;
 })(window.CL);

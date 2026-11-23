@@ -109,7 +109,7 @@
       renderStepCard(s);
       if (run.st.learnOffer) {
         const o = run.st.learnOffer;
-        const lc = h(`<div class="card cyan" style="gap:10px"><span class="kicker k-cyan">NEW CONTROL</span><span class="txt" style="color:#D6EEF4;font-size:15px">Your FLX4 sent a signal the app doesn't know yet. Was that <b>${esc(CL.controls[o.id].name)}</b>?</span><div style="display:flex;gap:10px"><button class="btn primary ly">Yes, that's it</button><button class="btn ln">No</button></div></div>`);
+        const lc = h(`<div class="card cyan" style="gap:10px"><span class="kicker k-cyan">NEW CONTROL</span><span class="txt" style="color:#D6EEF4;font-size:15px">Your FLX4 sent a signal the app doesn't know yet. Was that ${esc(CL.controls[o.id].name)}?</span><div style="display:flex;gap:10px"><button class="btn primary ly">Yes, that's it</button><button class="btn ln">No</button></div></div>`);
         right.appendChild(lc); lc.querySelector('.ly').onclick = () => run.acceptLearn(true); lc.querySelector('.ln').onclick = () => run.acceptLearn(false);
       }
       if ((s.c.t === 'transitions' || s.c.t === 'setExam') && run.transList && run.transList.length) right.appendChild(h(`<div class="card green"><h3>Transitions counted</h3>${run.transList.map((t, i) => `<span style="font-size:13px;color:#9FE3B9">${i + 1}. ${esc(t)}</span>`).join('')}</div>`));
@@ -195,7 +195,7 @@
       const c = s.c;
       const tid = c.id || (c.parts && c.parts[0].id) || (s.hl || [])[0] || (c.deck ? 'd' + c.deck + (c.t === 'sync' ? 'sync' : 'play') : null);
       const card = h(`<div class="card cyan" style="gap:10px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="big" style="font-size:22px">Need a hand?</span><span class="small" style="color:#A9D9E6">No move for ${run.st.hint >= 2 ? 20 : 12} s</span></div>
-        <span class="txt" style="color:#D6EEF4">${tid && CL.controls[tid] ? 'You need <b>' + esc(CL.controls[tid].name) + '</b>, glowing pink. Here it is up close:' : esc(s.text)}</span>
+        <span class="txt" style="color:#D6EEF4">${tid && CL.controls[tid] ? 'You need ' + esc(CL.controls[tid].name) + ', glowing pink. Here it is up close:' : esc(s.text)}</span>
         <div class="cu"></div>
         <div style="display:flex;gap:10px"><button class="btn primary sm3">▶ Watch this step</button>${run.st.hint >= 2 ? '<button class="btn sm2">Show me on the panel</button>' : ''}<button class="btn sm1">I've got it</button></div></div>`);
       right.appendChild(card);

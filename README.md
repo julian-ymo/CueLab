@@ -43,3 +43,7 @@ npm run dist     # build the Windows installer into dist/
 Every push to `main` builds the installer with GitHub Actions and publishes it as a release.
 
 MIDI message map cross-checked against the Mixxx DDJ-FLX4 mapping. Pioneer DJ, DDJ-FLX4, rekordbox and Serato are trademarks of their owners; CueLab is not affiliated with them.
+
+## Languages
+
+CueLab speaks English and Burmese (မြန်မာ). Switch in **Settings** or with the English / မြန်မာ switch at the bottom of the sidebar. Labels printed on the FLX4 stay in English so they match the controller. Windows has no built-in Burmese voice, so lesson videos show Burmese captions in Burmese mode.
