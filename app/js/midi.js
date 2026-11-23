@@ -48,7 +48,9 @@
   btn(0x96, 0x41, 'browse', { press: true }); btn(0x96, 0x42, 'browse', { press: true });
   btn(0x94, 0x63, 'fxsel'); btn(0x94, 0x64, 'fxsel', { shift: true });
   btn(0x94, 0x4A, 'fxbL'); btn(0x94, 0x4B, 'fxbR');
-  btn(0x94, 0x47, 'fxon');
+  btn(0x94, 0x47, 'fxon'); btn(0x95, 0x47, 'fxon', { ch: 2 }); btn(0x94, 0x43, 'fxon', { shift: true }); btn(0x95, 0x43, 'fxon', { shift: true, ch: 2 });
+  // FX channel switch (1 / 2 / 1&2): CH1 = 0x94 0x10, CH2 = 0x95 0x11 (cross-checked with Mixxx); leaving both = 1&2
+  btn(0x94, 0x10, 'fxch', { chSet: 1 }); btn(0x95, 0x11, 'fxch', { chSet: 2 });
   cc14(0xB4, 0x02, 'fxlevel');
   M.MAP = MAP;
 
@@ -75,7 +77,7 @@
     try { M.output.send([l[0], l[1], v]); } catch (e) { /* device unplugged */ }
   };
   M.padLed = function (deck, i, mode, on) {
-    const base = { hot: 0x00, fx: 0x10, jump: 0x20, samp: 0x30 }[mode] || 0;
+    const base = { hot: 0x00, fx: 0x10, jump: 0x20, samp: 0x30, loop: 0x60 }[mode] || 0;
     const st = deck === 1 ? 0x97 : 0x99;
     if (!M.output) return;
     const key = 'pad' + deck + mode + i, v = on ? 0x7F : 0;
@@ -110,7 +112,7 @@
     if (!m) {
       M.unknownCount++;
       addLog('Unknown message ' + key.toUpperCase() + ' (' + d2 + ')');
-      CL.emit('midi-unknown', { key, value: d2 });
+      CL.emit('midi-unknown', { key, value: d2, cc: type === 0xB0, down: type === 0x90 && d2 > 0 });
       return;
     }
     const id = m.id;
@@ -119,7 +121,7 @@
       if (id === 'd1shift' || id === 'd2shift') { M.shift[id === 'd1shift' ? 1 : 2] = down; }
       if (m.touch) { CL.jogTouch[id] = down; CL.emit('jog-touch', { id, down }); addLog((down ? 'Touch ' : 'Release ') + CL.controls[id].name); return; }
       if (m.press) { if (down) CL.emit('browse-press', {}); return; }
-      CL.input(id, down, 'midi', { shift: !!m.shift, mode: m.mode, pad: !!m.pad, long: !!m.long, tempoRange: !!m.tempoRange });
+      CL.input(id, down, 'midi', { shift: !!m.shift, mode: m.mode, pad: !!m.pad, long: !!m.long, tempoRange: !!m.tempoRange, ch: m.ch, chSet: m.chSet });
       if (down) addLog((m.shift ? 'SHIFT + ' : '') + CL.controls[id].name + ' pressed');
     } else if (m.type === 'cc14') {
       if (m.part === 'msb') {

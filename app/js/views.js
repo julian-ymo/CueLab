@@ -180,7 +180,10 @@
       <label class="col" style="gap:6px;font-size:13px;color:var(--dim2)">Output device (choose your DDJ-FLX4 for speakers + headphones)<select class="inp out"></select></label>
       <label style="display:flex;gap:10px;align-items:center;font-size:13px"><input type="checkbox" class="c34"> Headphone cue on outputs 3–4 (FLX4 headphones jack)</label>
       <label style="display:flex;gap:10px;align-items:center;font-size:13px"><input type="checkbox" class="inv"> Reverse the TEMPO sliders</label>
-      <span class="small rt"></span></div>`);
+      <label style="display:flex;gap:10px;align-items:center;font-size:13px">Jog wheel feel <input type="range" class="jf" min="0.5" max="2" step="0.1" style="flex:1"><span class="jfv small" style="width:40px"></span></label>
+      <div style="display:flex;gap:8px"><button class="btn sm ts">Test speakers</button><button class="btn sm th">Test headphones</button></div>
+      <span class="small rt"></span>
+      <div class="q4 card amber" style="display:none;padding:12px 14px;gap:6px"><b style="color:#FFD08A;font-size:13px">Headphone cue needs 4 channels</b><span style="font-size:12px;color:#E8D9BC;line-height:1.5">Windows is giving CueLab only 2 channels of your FLX4, so cue can't reach the headphone jack. Fix: Windows <b>Sound settings → More sound settings → Playback</b> → right-click <b>Speakers (DDJ-FLX4)</b> → <b>Configure</b> → choose <b>Quadraphonic</b> → Next → Finish. Then restart CueLab.</span></div></div>`);
     right.appendChild(audio);
     const tools = h(`<div class="card"><h3>Also use with your DJ software</h3><span class="txt" style="font-size:13px">Export practice tracks as WAV files from the Music Library and add them to rekordbox or Serato. Close CueLab before opening another DJ app, so the FLX4 isn't shared by two apps.</span><div style="display:flex;gap:8px"><button class="btn sm rescan">Rescan USB</button><button class="btn sm forget">Forget learned controls</button></div></div>`);
     right.appendChild(tools);
@@ -195,6 +198,10 @@
     c34.checked = CL.store.settings.cueToOut34; inv.checked = CL.store.settings.invertTempo;
     c34.onchange = () => { CL.store.settings.cueToOut34 = c34.checked; CL.save(); CL.audio.route(); };
     inv.onchange = () => { CL.store.settings.invertTempo = inv.checked; CL.save(); };
+    const jf = audio.querySelector('.jf'); jf.value = CL.store.settings.jogFeel || 1; audio.querySelector('.jfv').textContent = (+jf.value).toFixed(1) + '×';
+    jf.oninput = () => { CL.store.settings.jogFeel = +jf.value; CL.save(); audio.querySelector('.jfv').textContent = (+jf.value).toFixed(1) + '×'; };
+    audio.querySelector('.ts').onclick = () => CL.audio.testTone('master');
+    audio.querySelector('.th').onclick = () => { CL.audio.testTone('hp'); if (!CL.audio.fourCh) CL.toast('Headphone test: only works when the FLX4 gives 4 channels (see the note below).'); };
     tools.querySelector('.rescan').onclick = () => { CL.midi.start(); CL.toast('Looking for your controller…'); };
     tools.querySelector('.forget').onclick = () => { CL.store.learned = {}; CL.save(); CL.toast('Learned controls cleared'); };
     function setTarget(i) {
@@ -222,6 +229,8 @@
       test.querySelector('.tb').style.width = (tested.size / TEST.length * 100) + '%';
       const lg = M.log.slice(0, 14).map(l => `<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:4px"><span>${esc(l.text)}</span><span style="color:var(--dim)">${new Date(l.t).toLocaleTimeString()}</span></div>`).join('') || '<span class="small">Move anything on your FLX4 — it shows up here.</span>';
       const le = log.querySelector('.lg'); if (le.innerHTML !== lg) le.innerHTML = lg;
+      const selLabel = (audio.querySelector('.out').selectedOptions[0] || {}).textContent || '';
+      audio.querySelector('.q4').style.display = !CL.audio.fourCh && /flx4|ddj/i.test(selLabel) ? 'flex' : 'none';
       audio.querySelector('.rt').textContent = CL.audio.fourCh ? 'Speakers: outputs 1–2 · Headphones: outputs 3–4' : 'This output has 2 channels: headphone cue needs the FLX4 selected above.';
     });
     return { destroy() { stop(); offs.forEach(f => f()); CL.midi.learnTarget = null; } };
@@ -229,6 +238,7 @@
 
   // ======================= STUDY MODE =======================
   const study = CL.study = { running: false, phase: 'focus', left: 0, auto: false, timer: null };
+  study.stopAll = function () { study.running = false; clearInterval(study.timer); autoMix.stop(); if (CL.audio.out) CL.audio.out.gain.value = 0.9; };
   CL.views.study = function (main) {
     CL.audio.init();
     const S = CL.store.settings;
@@ -270,7 +280,7 @@
         }
       }, 1000);
     }
-    function pause() { study.running = false; clearInterval(study.timer); autoMix.stop(); CL.audio.out.gain.value = 0.9; }
+    function pause() { study.stopAll(); }
     const stop = CL.every(() => {
       const total = (study.phase === 'focus' ? S.studyFocus : S.studyBreak) * 60;
       q('.tm').textContent = CL.fmtTime(study.left);

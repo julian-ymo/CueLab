@@ -12,7 +12,9 @@ Go to **Releases** (right side of this page) and download `CueLab-Setup-x.y.z.ex
 
 ## What's inside
 
-- **38 lessons** in 4 levels (Basic → Intermediate → Advanced → Pro). Each lesson: **Watch** (the app does it on your decks), **Learn why**, **Do it** (step by step on your FLX4) and a scored **Test**.
+- **Works fully offline** — no internet needed for anything: lessons, videos, music, voice.
+- **38 lessons** in 4 levels (Basic → Intermediate → Advanced → Pro). Each lesson: **Watch** (a narrated lesson video), **Learn why**, **Do it** (step by step on your FLX4) and a scored **Test**.
+- **Lesson videos**: made by the app from each lesson — camera zooms to the control, an animated hand shows the move, captions, chapters, 0.75–1.25× speed, and narration with the voices built into Windows. The video plays on your real decks so you hear every move. Stuck on a step? "Watch this step" plays just that part.
 - **Live DDJ-FLX4 panel** that mirrors your controller: the control to touch glows pink with an arrow, numbers show the order, buttons with lights flash on the real controller.
 - **Help when you go wrong**: names the wrong control and shows how to put it back, warns when you turn the wrong way or miss the timing, shows a close-up after 12 s, and offers Slow mode / Show me / Skip after 3 tries.
 - **Practice Studio**: two decks, waveforms, phrase coach, mix health, record your mix.
@@ -24,7 +26,9 @@ Go to **Releases** (right side of this page) and download `CueLab-Setup-x.y.z.ex
 
 The DDJ-FLX4 is USB MIDI class-compliant — no driver needed. In **DDJ-FLX4** in the app:
 1. Choose the FLX4 as the audio output (speakers on outputs 1–2, headphone cue on 3–4).
-2. Run the **Control test**. If a control isn't recognised, moving it during the test teaches it to the app.
+2. Run the **Control test**. If a control isn't recognised, moving it during the test teaches it to the app. During lessons the app also asks "was that the control?" when it sees a signal it doesn't know.
+3. Headphone cue needs 4 output channels. If Windows only gives 2: Sound settings → More sound settings → Playback → Speakers (DDJ-FLX4) → Configure → Quadraphonic. Use **Test speakers / Test headphones** to check.
+4. Jog feel and reversed tempo slider can be changed on the same page.
 
 No controller? Click buttons, drag knobs and faders, and drag the jog wheels on screen.
 

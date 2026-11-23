@@ -22,6 +22,7 @@
   CL.views = {};
   let current = null, currentName = '';
   CL.go = function (name, params) {
+    if (name !== 'study' && CL.study && CL.study.running && CL.study.stopAll) { CL.study.stopAll(); CL.toast('Study music paused — you left Study mode.'); }
     if (current && current.destroy) current.destroy();
     const main = $('#main'); main.innerHTML = '';
     currentName = name;
@@ -129,8 +130,8 @@
       for (; fb + b * bl < startS + span; b++) {
         const x = ((fb + b * bl) - startS) / span * W;
         const bar1 = ((b % 4) + 4) % 4 === 0, phrase = ((b % 64) + 64) % 64 === 0;
-        g.fillStyle = phrase ? '#FF5FA2' : bar1 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)';
-        g.fillRect(x, 0, phrase ? 3 : bar1 ? 2 : 1, H);
+        g.fillStyle = phrase ? '#FF5FA2' : bar1 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.32)';
+        g.fillRect(x - 1, 0, phrase ? 5 : bar1 ? 4 : 2, H);
         if (phrase) { g.font = 'bold 20px Segoe UI'; g.fillText(String(b / 4 + 1), x + 6, 22); }
       }
       if (d.loop.on) { g.fillStyle = 'rgba(91,214,138,0.18)'; const x1 = (d.loop.start - startS) / span * W, x2 = (d.loop.end - startS) / span * W; g.fillRect(x1, 0, x2 - x1, H); }

@@ -5,7 +5,8 @@
   const FX_TYPES = ['Echo', 'Reverb', 'Spiral'];
   const BEATS = [0.25, 0.5, 0.75, 1, 2, 4];
   const RANGES = [0.06, 0.10, 0.16, 1.0];
-  const SEC_PER_TICK = 1.8 / 720; // FLX4 jog: ~720 ticks per turn at 33⅓ rpm
+  const SEC_PER_TICK_BASE = 1.8 / 720; // FLX4 jog: ~720 ticks per turn at 33⅓ rpm
+  const tickSec = () => SEC_PER_TICK_BASE * (CL.store.settings.jogFeel || 1);
 
   const dbToGain = db => Math.pow(10, db / 20);
 
@@ -253,6 +254,16 @@
     return d;
   };
 
+  // short beeps to check where sound comes out
+  A.testTone = function (where) {
+    A.init(); A.resume();
+    const ctx = A.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = where === 'hp' ? 660 : 440;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    [0, 0.25, 0.5].forEach(t => { g.gain.setValueAtTime(0.25, ctx.currentTime + t); g.gain.setValueAtTime(0, ctx.currentTime + t + 0.15); });
+    o.connect(g); g.connect(where === 'hp' ? A.hp : A.out);
+    o.start(); o.stop(ctx.currentTime + 0.8);
+  };
   A.anyPlaying = () => A.ready && (A.decks[1].playing || A.decks[2].playing);
 
   // tempo
@@ -281,7 +292,7 @@
   // ---------- scratch ----------
   function scratchStep(d) {
     const sc = d.scratch; if (!sc) return;
-    const dt = sc.acc * SEC_PER_TICK; sc.acc = 0;
+    const dt = sc.acc * tickSec(); sc.acc = 0;
     if (Math.abs(dt) < 0.0005 || !d.buffer) return;
     const ctx = A.ctx, grain = 0.03;
     const src = ctx.createBufferSource();
@@ -342,7 +353,13 @@
     } else if (mode === 'samp' || mode === 'keys') {
       if (!down) return;
       A.playSample(i);
-    } else if (mode === 'fx' || mode === 'fx2' || mode === 'loop') {
+    } else if (mode === 'loop') {
+      if (!down || !d.track) return;
+      const beats = [0.25, 0.5, 1, 2, 4, 8, 16, 32][i], len = beats * d.beatLen;
+      if (d.loop.on && Math.abs((d.loop.end - d.loop.start) - len) < 0.001) { d.exitLoop(); return; }
+      const p = d.getPos(); let st = d.nearestBeat(p); if (st > p + 0.02) st -= d.beatLen;
+      d.setLoop(st, st + len);
+    } else if (mode === 'fx' || mode === 'fx2') {
       if (!d.track) return;
       if (down) {
         d.commit();
@@ -400,8 +417,8 @@
         if (!d.buffer) return;
         if (d.scratch && ev.top) { d.scratch.acc += ev.value; return; }
         if (ev.shift) { d.commit(); d.seek(d.getPos() + ev.value * 0.04); return; }
-        if (!d.playing) { d.pos = CL.clamp(d.pos + ev.value * SEC_PER_TICK * 2, 0, d.duration); d.p0 = d.pos; CL.emit('deck', d); return; }
-        d.bend = CL.clamp(ev.value * 0.006, -0.12, 0.12); d.setRate();
+        if (!d.playing) { d.pos = CL.clamp(d.pos + ev.value * tickSec() * 2, 0, d.duration); d.p0 = d.pos; CL.emit('deck', d); return; }
+        d.bend = CL.clamp(ev.value * 0.006 * (CL.store.settings.jogFeel || 1), -0.12, 0.12); d.setRate();
         clearTimeout(d.bendT); d.bendT = setTimeout(() => { d.bend = 0; d.setRate(); }, 110);
       } else if (what === 'in' && down) {
         if (!d.track) return;
@@ -435,11 +452,15 @@
     }
     if (/^hcue[12]$/.test(id)) { if (ev.value === true) { V[id + 'On'] = !V[id + 'On']; applyMixer(); CL.emit('cue-toggle', id); } return; }
     if (/^(trim|hi|mid|low|cfx|fader)[12]$/.test(id) || id === 'xfader' || id === 'hpmix') { applyMixer(); return; }
-    if (id === 'fxon' && ev.value === true) { A.fx.on = !A.fx.on; applyFx(); return; }
+    if (id === 'fxon' && ev.value === true) { if (ev.ch) A.fx.ch = ev.ch; A.fx.on = !A.fx.on; applyFx(); return; }
     if (id === 'fxsel' && ev.value === true) { A.fx.type = (A.fx.type + 1) % FX_TYPES.length; applyFx(); return; }
     if (id === 'fxbL' && ev.value === true) { A.fx.beatIdx = Math.max(0, A.fx.beatIdx - 1); applyFx(); return; }
     if (id === 'fxbR' && ev.value === true) { A.fx.beatIdx = Math.min(BEATS.length - 1, A.fx.beatIdx + 1); applyFx(); return; }
-    if (id === 'fxch' && ev.value === true) { A.fx.ch = A.fx.ch === 1 ? 2 : A.fx.ch === 2 ? 3 : 1; applyFx(); return; }
+    if (id === 'fxch') {
+      if (ev.chSet) { A.fx.ch = ev.value === true ? ev.chSet : 3; applyFx(); return; } // hardware switch position
+      if (ev.value === true) { A.fx.ch = A.fx.ch === 1 ? 2 : A.fx.ch === 2 ? 3 : 1; applyFx(); }
+      return;
+    }
     if (id === 'fxlevel') { applyFx(); return; }
     if ((id === 'load1' || id === 'load2') && ev.value === true) { CL.emit('load-request', id === 'load1' ? 1 : 2); }
   });

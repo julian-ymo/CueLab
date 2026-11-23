@@ -4,6 +4,7 @@
   const h = s => CL.h(s), esc = CL.esc;
   const STAGES = [['watch', '1 Watch'], ['learn', '2 Learn why'], ['do', '3 Do it'], ['test', '4 Test']];
 
+  const V0 = { stop: () => CL.voice && CL.voice.stop() };
   CL.views.lesson = function (main, params) {
     const lesson = CL.lessonById(params.id) || CL.lessons[0];
     CL.audio.init();
@@ -31,8 +32,24 @@
     head.querySelector('.slow').onclick = () => { CL.audio.setSlow(!CL.audio.slowMode); };
 
     // ---------- stage switching ----------
+    let video = null;
+    const leftEl = body.querySelector('.left'), pboxEl = body.querySelector('.pbox');
     function setStage(s) {
-      stage = s; run.begin(s); renderTop(); sig = ''; render();
+      if (video) { video.destroy(); video.el.remove(); video = null; }
+      V0.stop();
+      stage = s; run.begin(s);
+      top.style.display = s === 'watch' ? 'none' : 'flex'; pboxEl.style.display = s === 'watch' ? 'none' : '';
+      renderTop(); sig = ''; render();
+      if (s === 'watch') {
+        const go = () => {
+          if (stage !== 'watch' || run.loading) { if (stage === 'watch') setTimeout(go, 150); return; }
+          video = new CL.VideoPlayer(leftEl, run, { real: true, autoplay: false, onEnd: () => { run.done = true; sig = ''; render(); } });
+          leftEl.insertBefore(video.el, leftEl.firstChild);
+          video.onFrame = i => { right.querySelectorAll('[data-ch]').forEach(e => e.classList.toggle('now', +e.dataset.ch === i)); };
+          sig = ''; render();
+        };
+        go();
+      }
       head.querySelectorAll('[data-stage]').forEach(b => b.classList.toggle('on', b.dataset.stage === s));
     }
 
@@ -45,11 +62,7 @@
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto"><span class="chip">FLX4: ${esc(lesson.uses)}</span><span class="chip">${lesson.mins} min</span><span class="chip">${lesson.steps.length} steps</span></div></div>`));
         top.appendChild(h(`<div class="card" style="flex:1"><h3>Key words</h3>${(lesson.words || []).map(w => `<div class="col" style="gap:2px"><span style="font-size:13px;font-weight:700;color:var(--amber)">${esc(w[0])}</span><span style="font-size:13px;color:var(--dim2);line-height:1.4">${esc(w[1])}</span></div>`).join('') || '<span class="small">—</span>'}</div>`));
       } else if (stage === 'watch') {
-        top.appendChild(h(`<div class="card cyan" style="flex:1;padding:20px 22px"><span class="kicker k-cyan wk">THE APP IS DOING IT</span><span class="big wt" style="font-size:28px"></span><span class="txt wx" style="font-size:15px;color:#D6EEF4"></span>
-          <div style="display:flex;gap:10px;margin-top:auto"><button class="btn wp">Pause</button><button class="btn wr">Watch again</button><button class="btn primary wd">Now you try: Do it →</button></div></div>`));
-        top.querySelector('.wp').onclick = () => { run.demoPaused = !run.demoPaused; top.querySelector('.wp').textContent = run.demoPaused ? 'Resume' : 'Pause'; };
-        top.querySelector('.wr').onclick = () => setStage('watch');
-        top.querySelector('.wd').onclick = () => setStage('do');
+        // the video player takes the whole left side
       } else {
         const s1 = CL.deckStrip(1, { h: 44 }), s2 = CL.deckStrip(2, { h: 44 });
         const col = h(`<div class="col" style="flex:1;gap:10px;overflow:hidden"></div>`); col.appendChild(s1.el); col.appendChild(s2.el); top.appendChild(col);
@@ -61,7 +74,7 @@
     let sig = '', closeP = null, listW = null;
     function signature() {
       const s = run.step, st = run.st || {};
-      return [stage, run.loading, run.done, run.i, st.complete ? 1 : 0, st.wrong ? st.wrong.id + st.wrong.putBack : '', st.wrongWay ? 1 : 0, st.hint, run.options, st.note, st.count, run.demoPhase, run.demoReveal, run.result ? run.result.score : '', st.extra && st.extra.reset].join('|');
+      return [stage, run.loading, run.done, run.i, st.complete ? 1 : 0, st.wrong ? st.wrong.id + st.wrong.putBack : '', st.wrongWay ? 1 : 0, st.hint, run.options, st.note, st.count, run.result ? run.result.score : '', st.extra && st.extra.reset, st.learnOffer ? st.learnOffer.key : '', run.transitions, !!video].join('|');
     }
     function render() {
       const sg = signature();
@@ -78,6 +91,7 @@
       if (overlay) { overlay.remove(); overlay = null; }
       if (stage === 'learn') return renderLearnRight();
       if (run.loading) { right.appendChild(h(`<div class="card"><h3>Getting your decks ready…</h3><span class="txt">Loading the practice tracks for this lesson.</span></div>`)); return; }
+      if (stage === 'watch' && !run.done) return renderWatchRight();
       if (run.done && stage === 'watch') {
         right.appendChild(h(`<div class="card green"><span class="kicker k-green">DEMO FINISHED</span><span class="big">Now it's your turn</span><span class="txt">Do the same moves on your FLX4. The app guides you step by step and tells you if something's off.</span><div style="display:flex;gap:10px"><button class="btn primary go-do">Do it</button><button class="btn go-learn">Learn why first</button></div></div>`));
         right.querySelector('.go-do').onclick = () => setStage('do'); right.querySelector('.go-learn').onclick = () => setStage('learn');
@@ -92,8 +106,13 @@
       }
       if (run.done && stage === 'test') return renderResult();
       const s = run.step; if (!s) return;
-      if (stage === 'watch') return renderWatchRight(s);
       renderStepCard(s);
+      if (run.st.learnOffer) {
+        const o = run.st.learnOffer;
+        const lc = h(`<div class="card cyan" style="gap:10px"><span class="kicker k-cyan">NEW CONTROL</span><span class="txt" style="color:#D6EEF4;font-size:15px">Your FLX4 sent a signal the app doesn't know yet. Was that <b>${esc(CL.controls[o.id].name)}</b>?</span><div style="display:flex;gap:10px"><button class="btn primary ly">Yes, that's it</button><button class="btn ln">No</button></div></div>`);
+        right.appendChild(lc); lc.querySelector('.ly').onclick = () => run.acceptLearn(true); lc.querySelector('.ln').onclick = () => run.acceptLearn(false);
+      }
+      if ((s.c.t === 'transitions' || s.c.t === 'setExam') && run.transList && run.transList.length) right.appendChild(h(`<div class="card green"><h3>Transitions counted</h3>${run.transList.map((t, i) => `<span style="font-size:13px;color:#9FE3B9">${i + 1}. ${esc(t)}</span>`).join('')}</div>`));
       if (run.st.wrong) renderWrong();
       else if (run.st.wrongWay) right.appendChild(h(`<div class="card orange" style="flex-direction:row;gap:12px;align-items:center"><span style="width:30px;height:30px;border-radius:15px;background:var(--orange);color:#1A1206;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">↺</span><span class="txt" style="color:#F2E6D0">${esc(run.st.wrongWay.text)}</span></div>`));
       if (stage === 'do' && run.st.hint >= 1 && !run.st.complete) renderHint(s);
@@ -113,21 +132,14 @@
       right.querySelector('.w').onclick = () => setStage('watch'); right.querySelector('.d').onclick = () => setStage('do');
       mistakesCard();
     }
-    function renderWatchRight(s) {
-      top.querySelector('.wt').textContent = s.title;
-      top.querySelector('.wx').textContent = s.text || (s.c.q || '');
-      top.querySelector('.wk').textContent = 'STEP ' + (run.i + 1) + ' OF ' + run.steps.length + (run.demoPhase === 'do' ? ' · DOING IT NOW' : ' · WATCH THE GLOW');
-      const c = s.c;
-      if (c.t === 'quiz') {
-        right.appendChild(h(`<div class="card"><h3>${esc(c.q)}</h3>${c.options.map((o, i) => `<div class="check${run.demoReveal && i === c.answer ? ' ok' : ''}">${run.demoReveal && i === c.answer ? '✓' : '○'} ${esc(o)}</div>`).join('')}${run.demoReveal ? `<span class="small">${esc(c.explain || '')}</span>` : ''}</div>`));
-      } else {
-        right.appendChild(h(`<div class="card pink"><span class="kicker k-pink">ON YOUR FLX4</span><span class="big">${esc(s.title)}</span><span class="txt" style="color:#E2C9D6">Watch the pink glow on the panel: that's the control. ${run.demoPhase === 'do' ? 'The app is moving it now — listen to what changes.' : ''}</span></div>`));
-        const tid = c.id || (c.parts && c.parts[0].id) || (s.hl || [])[0];
-        if (tid && CL.panelLayout.P[tid]) { const cc = h(`<div class="col" style="gap:6px"><span class="small">Close-up</span></div>`); right.appendChild(cc); closeP = CL.closeup(cc, tid, 230); }
-      }
-      mistakesCard();
+    function renderWatchRight() {
+      const card = h(`<div class="card" style="flex:1 1 0;min-height:0"><h3>In this video</h3><div class="col scroll" style="gap:6px;flex:1 1 0;min-height:0">${run.steps.map((st, i) => `<button class="lesson" data-ch="${i}"><span class="n">${i + 1}</span><span style="font-size:13px;font-weight:600;flex:1">${esc(st.title)}</span></button>`).join('')}</div></div>`);
+      right.appendChild(card);
+      card.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => video && video.start(+b.dataset.ch));
+      right.appendChild(h(`<div class="card cyan"><span class="txt" style="color:#D6EEF4">The video plays on your real decks, so you hear every move. ${CL.voice.available() ? 'The voice uses Windows\' built-in speech, so it works offline.' : 'Captions show what to do.'}</span><div style="display:flex;gap:10px"><button class="btn primary d">Now you try: Do it →</button><button class="btn l">Learn why</button></div></div>`));
+      right.querySelector('.d').onclick = () => setStage('do'); right.querySelector('.l').onclick = () => setStage('learn');
+      if (lesson.words && lesson.words.length) right.appendChild(h(`<div class="card"><h3>Key words</h3>${lesson.words.slice(0, 3).map(w => `<div class="col" style="gap:2px"><span style="font-size:13px;font-weight:700;color:var(--amber)">${esc(w[0])}</span><span style="font-size:13px;color:var(--dim2);line-height:1.4">${esc(w[1])}</span></div>`).join('')}</div>`));
     }
-
     function liveHtml(s) {
       const c = s.c;
       switch (c.t) {
@@ -135,7 +147,7 @@
         case 'onBar': case 'together': return `<div class="lv" style="background:#1A0F15;border-radius:12px;padding:14px;display:flex;align-items:center;gap:18px"><span class="lvbig big" style="font-size:44px;color:var(--amber);min-width:120px;text-align:center">–</span><div class="col" style="gap:6px;flex:1"><span class="lvr" style="font-size:14px;font-weight:600"></span><div class="dots" style="display:flex;gap:6px">${[1, 2, 3, 4].map(() => '<span style="width:28px;height:10px;border-radius:3px;background:#3A2030"></span>').join('')}</div></div></div>`;
         case 'bpm': return `<div class="lv" style="background:#1A0F15;border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:center"><span class="lvr" style="font-size:15px;font-weight:600"></span><span class="lvbig big" style="font-size:30px;color:var(--pink-text)"></span></div>`;
         case 'phase': return `<div class="lv" style="background:#1A0F15;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px"><span class="lvr" style="font-size:14px;font-weight:600"></span><div style="height:12px;border-radius:6px;background:#3A2030;position:relative"><span style="position:absolute;left:50%;top:-4px;width:2px;height:20px;background:#fff"></span><span class="lvdot" style="position:absolute;top:-1px;width:14px;height:14px;border-radius:7px;background:var(--amber);left:50%"></span></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#C9AAB9"><span>Deck ${c.deck} behind</span><span>in time</span><span>Deck ${c.deck} ahead</span></div></div>`;
-        case 'ready': return `<div class="col rd" style="gap:6px">${c.list.map(r => `<div class="check" data-r="${r.id}"><span class="ck">○</span><span>${esc(readyText(r))}</span></div>`).join('')}</div>`;
+        case 'ready': return `<div class="col rd" style="gap:6px">${c.list.map(r => `<div class="check" data-r="${r.id}"><span class="ck">○</span><span style="flex:1">${esc(readyText(r))}</span><span class="wg small" style="color:var(--amber)"></span></div>`).join('')}</div><span class="small" style="color:#E2C9D6">Not turning green? Wiggle that control a little — the app only knows where a knob or fader is after you move it.</span><button class="btn sm mn" style="align-self:flex-start">My controls are set — continue</button>`;
         case 'quiz': return `<div class="col" style="gap:8px">${c.options.map((o, i) => `<button class="btn qo" data-i="${i}" style="justify-content:flex-start;height:46px">${esc(o)}</button>`).join('')}</div>`;
         case 'manual': case 'info': return `<button class="btn primary mn" style="align-self:flex-start">${esc(c.label || 'Next')}</button>`;
         case 'rec': return `<button class="btn pink rb" style="align-self:flex-start">${c.on ? '● Record mix' : '■ Stop recording'}</button>`;
@@ -185,24 +197,35 @@
       const card = h(`<div class="card cyan" style="gap:10px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="big" style="font-size:22px">Need a hand?</span><span class="small" style="color:#A9D9E6">No move for ${run.st.hint >= 2 ? 20 : 12} s</span></div>
         <span class="txt" style="color:#D6EEF4">${tid && CL.controls[tid] ? 'You need <b>' + esc(CL.controls[tid].name) + '</b>, glowing pink. Here it is up close:' : esc(s.text)}</span>
         <div class="cu"></div>
-        <div style="display:flex;gap:10px">${run.st.hint >= 2 ? '<button class="btn primary sm2">▶ Show me the move</button>' : ''}<button class="btn sm1">I've got it</button></div></div>`);
+        <div style="display:flex;gap:10px"><button class="btn primary sm3">▶ Watch this step</button>${run.st.hint >= 2 ? '<button class="btn sm2">Show me on the panel</button>' : ''}<button class="btn sm1">I've got it</button></div></div>`);
       right.appendChild(card);
       if (tid && CL.panelLayout.P[tid] && !closeP) closeP = CL.closeup(card.querySelector('.cu'), tid, 200);
       card.querySelector('.sm1').onclick = () => run.dismissHint();
       const sm2 = card.querySelector('.sm2'); if (sm2) sm2.onclick = () => run.showMe();
+      card.querySelector('.sm3').onclick = () => openClip(run.i);
     }
+    let clip = null;
+    function openClip(i) {
+      if (clip) return;
+      const ov = h(`<div class="overlay" style="z-index:40"><div class="modal" style="width:1040px;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="big" style="font-size:22px">Step ${i + 1}: ${esc(run.steps[i].title)}</span><button class="btn sm cl">Close</button></div><div class="vh"></div><span class="small">This clip only shows the move on screen — your decks keep playing as they are.</span></div></div>`);
+      main.appendChild(ov);
+      const vp = new CL.VideoPlayer(ov.querySelector('.vh'), run, { real: false, only: i, autoplay: true });
+      clip = { ov, vp };
+      ov.querySelector('.cl').onclick = closeClip;
+    }
+    function closeClip() { if (!clip) return; clip.vp.destroy(); clip.ov.remove(); clip = null; run.dismissHint && run.st && (run.st.lastProgress = performance.now()); }
     function renderOptions() {
       const why = (run.st.why || []).slice(-3);
       overlay = h(`<div class="overlay"><div class="modal"><span class="kicker k-amber">3 TRIES ON THIS STEP</span><span class="big">This one is tricky. How do you want to continue?</span>
         <div style="display:flex;gap:8px">${why.map((w, i) => `<span class="chip" style="background:var(--amber-bg);color:#FFD08A">Try ${i + 1} · ${esc(w)}</span>`).join('')}</div>
         <div class="row">
           <div class="card" style="flex:1;background:var(--card2);border:1px solid var(--cyan)"><span class="big" style="color:var(--cyan)">½×</span><b>Slow mode</b><span class="txt" style="font-size:13px;flex:1">The music slows down (about 90 BPM) and hints stay on.</span><button class="btn primary o1">Try slower</button></div>
-          <div class="card" style="flex:1;background:var(--card2)"><span class="big" style="color:var(--pink)">▶</span><b>Show me</b><span class="txt" style="font-size:13px;flex:1">The panel plays the move by itself. Then you copy it.</span><button class="btn o2">Watch the move</button></div>
+          <div class="card" style="flex:1;background:var(--card2)"><span class="big" style="color:var(--pink)">▶</span><b>Show me</b><span class="txt" style="font-size:13px;flex:1">A short video shows the move. Then you copy it.</span><button class="btn o2">Watch the move</button></div>
           <div class="card" style="flex:1;background:var(--card2)"><span class="big" style="color:var(--dim)">⇥</span><b>Skip for now</b><span class="txt" style="font-size:13px;flex:1">Saved to practise later — you'll need it to pass the test.</span><button class="btn o3">Skip step</button></div>
         </div><button class="btn sm o4" style="align-self:flex-end">Keep trying</button></div></div>`);
       main.appendChild(overlay);
       overlay.querySelector('.o1').onclick = () => run.slowMode(true);
-      overlay.querySelector('.o2').onclick = () => run.showMe();
+      overlay.querySelector('.o2').onclick = () => { run.closeOptions(); openClip(run.i); };
       overlay.querySelector('.o3').onclick = () => run.skip();
       overlay.querySelector('.o4').onclick = () => run.closeOptions();
     }
@@ -269,7 +292,7 @@
         q('.lvdot').style.left = 'calc(' + (50 + CL.clamp(ph, -0.5, 0.5) * 100) + '% - 7px)';
         q('.lvdot').style.background = Math.abs(ph) <= c.tol ? 'var(--green)' : 'var(--amber)';
       }
-      if (c.t === 'ready') right.querySelectorAll('[data-r]').forEach(e => { const r = c.list.find(x => x.id === e.dataset.r); const ok = Math.abs(CL.val[r.id] - r.to) <= (r.tol || 0.06) || (r.to <= 0.01 && CL.val[r.id] <= 0.06) || (r.to >= 0.99 && CL.val[r.id] >= 0.94); e.classList.toggle('ok', ok); e.querySelector('.ck').textContent = ok ? '✓' : '○'; });
+      if (c.t === 'ready') right.querySelectorAll('[data-r]').forEach(e => { const r = c.list.find(x => x.id === e.dataset.r); const wg = e.querySelector('.wg'); if (wg) wg.textContent = CL.midi.status === 'connected' && !CL.touched[r.id] ? 'wiggle it' : ''; const ok = Math.abs(CL.val[r.id] - r.to) <= (r.tol || 0.06) || (r.to <= 0.01 && CL.val[r.id] <= 0.06) || (r.to >= 0.99 && CL.val[r.id] >= 0.94); e.classList.toggle('ok', ok); e.querySelector('.ck').textContent = ok ? '✓' : '○'; });
       const cnt = { scratch: [st.count, c.count, 'moves'], scratchCut: [st.count, c.count, 'cuts'], beatjump: [st.count, c.count, 'jumps'], roll: [st.count, c.count, 'rolls'], samples: [st.count, c.count, 'sounds'], hotcue: [A.decks[c.deck || 1].hot.filter(x => x != null).length, c.count, 'hot cues'], transitions: [run.transitions, c.count, 'transitions'], move: [Math.min(c.amount, st.acc).toFixed(1), c.amount, 'moved'] }[c.t];
       if (cnt && q('.lvr')) { q('.lvr').textContent = cnt[2]; q('.lvbig').textContent = cnt[0] + ' / ' + cnt[1]; }
       if (c.t === 'timer' && q('.lvr')) { q('.lvr').textContent = c.label || 'Time'; q('.lvbig').textContent = Math.max(0, Math.ceil(st.extra.left || 0)) + ' s'; }
@@ -282,6 +305,6 @@
     const offs = [CL.on('lesson', () => render())];
     const stop = CL.every(live);
     setStage(stage);
-    return { destroy() { stop(); offs.forEach(f => f()); run.destroy(); if (listW) listW.destroy(); CL.guideLit = []; if (CL.audio.slowMode) CL.audio.setSlow(false); } };
+    return { destroy() { stop(); offs.forEach(f => f()); if (video) video.destroy(); closeClip(); V0.stop(); run.destroy(); if (listW) listW.destroy(); CL.guideLit = []; if (CL.audio.slowMode) CL.audio.setSlow(false); } };
   };
 })(window.CL);

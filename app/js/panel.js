@@ -211,16 +211,16 @@
           const e = this.els['d' + n + 'p' + (i + 1)];
           const lit = d && ((d.padMode === 'hot' && d.hot[i] != null) || d.padMode === 'jump' || (d.padMode === 'samp' && A.samples && A.samples[i]));
           e.classList.toggle('pad-lit', !!lit);
-          e.classList.toggle('pad-down', !!CL.val['d' + n + 'p' + (i + 1)]);
+          e.classList.toggle('pad-down', !!V['d' + n + 'p' + (i + 1)]);
         }
         const lv = A && A.ready ? A.levels[n] : 0; const segsOn = Math.min(5, Math.round(lv * 14));
         this.meters[n].forEach((e, s) => { e.style.opacity = (4 - s) < segsOn ? 1 : 0.15; });
-        this.els['d' + n + 'shift'].classList.toggle('btn-down', !!CL.val['d' + n + 'shift']);
+        this.els['d' + n + 'shift'].classList.toggle('btn-down', !!V['d' + n + 'shift']);
       });
       const xf = P.xfader; setH('xfader', 496 + V.xfader * 102, xf.y);
       if (A && A.ready) this.els.fxon.classList.toggle('led-on', A.fx.on);
       ['d1play', 'd2play', 'd1cue', 'd2cue', 'd1sync', 'd2sync', 'load1', 'load2', 'fxsel', 'fxbL', 'fxbR', 'fxch', 'd1in', 'd2in', 'd1out', 'd2out', 'd1exit', 'd2exit', 'd1callL', 'd2callL', 'd1callR', 'd2callR', 'hcue1', 'hcue2', 'fxon']
-        .forEach(id => { const e = this.els[id]; if (e) e.classList.toggle('btn-down', CL.val[id] === true); });
+        .forEach(id => { const e = this.els[id]; if (e) e.classList.toggle('btn-down', V[id] === true); });
       const t = CL.midiFlash && performance.now() - CL.midiFlash < 120;
       this.midiDot.style.background = t ? '#8BD650' : (CL.midi && CL.midi.status === 'connected' ? '#3F6B2A' : '#3A3A3E');
     }

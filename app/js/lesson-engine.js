@@ -55,8 +55,9 @@
       this.i = 0;
       this.offs.push(CL.on('control', e => this.onControl(e)));
       this.offs.push(CL.on('frame', () => this.onFrame()));
+      this.offs.push(CL.on('midi-unknown', d => this.onUnknown(d)));
       ['beat', 'loop', 'hotcue', 'fx', 'roll', 'beatjump', 'jog-touch', 'browse', 'deck-loaded', 'cue-toggle', 'tempo-range', 'rec', 'sample', 'sync', 'cue-set'].forEach(ev => this.offs.push(CL.on(ev, d => this.onEvent(ev, d))));
-      if (stage === 'watch') { this.enter(0); this.runDemo(); return; }
+      if (stage === 'watch') { this.enter(0); return; }
       this.enter(0);
       this.idleT = setInterval(() => this.idleTick(), 500);
     }
@@ -86,7 +87,7 @@
       if (c.t === 'onBar' || c.t === 'together') st.extra.target = null;
       if (c.t === 'timer') st.extra.left = c.seconds;
       if (c.t === 'compatKey' || c.t === 'load') st.extra.loadsAt = deck(c.deck).track;
-      if (c.t === 'transitions' || c.t === 'setExam') { this.transitions = 0; this.liveDeck = 0; this.liveTrack = null; st.extra.played = 0; }
+      if (c.t === 'transitions' || c.t === 'setExam') { this.transitions = 0; this.transList = []; this.liveDeck = 0; this.liveTrack = null; this.candDeck = 0; st.extra.played = 0; }
       this.updateGuide();
       this.emit();
     }
@@ -237,6 +238,30 @@
       st.complete = true; this.emit();
     }
 
+    // ---------- unknown MIDI: ask "was that the control?" ----------
+    onUnknown(d) {
+      if (this.done || !this.step || this.stage === 'watch' || this.stage === 'learn') return;
+      if (!d.cc && !d.down) return;
+      const s = this.step, c = s.c;
+      const cand = [c.id].concat((c.parts || []).map(p => p.id), s.hl || [], Object.keys(s.order || {}),
+        c.t === 'sync' || c.t === 'tempoRange' ? ['d' + c.deck + 'sync'] : [], c.t === 'playing' || c.t === 'paused' ? ['d' + c.deck + 'play'] : [],
+        c.t === 'fx' ? ['fxon'] : [], c.t === 'fxType' ? ['fxsel'] : [], c.t === 'fxBeat' ? ['fxbR', 'fxbL'] : [], c.t === 'cueToggle' ? ['hcue' + c.ch] : [])
+        .filter(id => id && CL.controls[id] && !CL.controls[id].hardware && !CL.touched[id]);
+      const want = cand.find(id => { const k = CL.controls[id].kind; return d.cc ? (k !== 'button' && k !== 'pad') : (k === 'button' || k === 'pad'); });
+      if (!want) return;
+      this.st.learnOffer = { key: d.key, id: want, cc: d.cc };
+      this.emit();
+    }
+    acceptLearn(yes) {
+      const o = this.st.learnOffer; this.st.learnOffer = null;
+      if (yes && o) {
+        CL.store.learned[o.key] = o.id; CL.save();
+        if (!o.cc) { CL.input(o.id, true, 'midi'); CL.input(o.id, false, 'midi'); }
+        CL.toast('Learned: ' + CL.controls[o.id].name);
+      }
+      this.emit();
+    }
+
     // ---------- events from the engine ----------
     onEvent(ev, d) {
       if (this.done || !this.step || this.stage === 'learn' || this.stage === 'watch') return;
@@ -312,17 +337,21 @@
       if (pass) this.ok();
     }
     trackLive() {
-      const V = CL.val;
-      const aud = n => { const d = deck(n); if (!d.playing || !d.track) return 0; const xf = n === 1 ? Math.min(1, 2 * (1 - V.xfader)) : Math.min(1, 2 * V.xfader); return V['fader' + n] * xf * (V['low' + n] > 0.1 ? 1 : 0.6); };
+      // a deck is "live" when it's clearly the one the crowd hears, for at least 2 seconds
+      const V = CL.val, now = performance.now();
+      const aud = n => { const d = deck(n); if (!d.playing || !d.track) return 0; const xf = n === 1 ? Math.min(1, 2 * (1 - V.xfader)) : Math.min(1, 2 * V.xfader); return V['fader' + n] * V['fader' + n] * xf; };
       const a1 = aud(1), a2 = aud(2);
-      const live = a1 > a2 + 0.25 ? 1 : a2 > a1 + 0.25 ? 2 : 0;
-      if (live && live !== this.liveDeck) {
-        const t = deck(live).track;
-        if (this.liveDeck && t && t !== this.liveTrack) { this.transitions++; this.emit(); }
-        this.liveDeck = live; this.liveTrack = t;
+      const cand = a1 > 0.4 && a2 < 0.25 ? 1 : a2 > 0.4 && a1 < 0.25 ? 2 : 0;
+      if (cand !== this.candDeck) { this.candDeck = cand; this.candT = now; return; }
+      if (!cand || now - this.candT < 2000 || cand === this.liveDeck) return;
+      const t = deck(cand).track;
+      if (this.liveDeck && t && this.liveTrack && t !== this.liveTrack) {
+        this.transitions++;
+        (this.transList = this.transList || []).push(this.liveTrack.title + ' → ' + t.title);
+        this.emit();
       }
+      this.liveDeck = cand; this.liveTrack = t;
     }
-
     // ---------- timing: press on a bar ----------
     nextTarget(d, every) {
       const bi = d.beatIndexAt(d.getPos()), barF = bi / 4;
@@ -444,60 +473,7 @@
     slowMode(on) { A().setSlow(on); this.options = false; this.st.lastProgress = performance.now(); this.emit(); }
     closeOptions() { this.options = false; this.emit(); }
 
-    // ---------- Watch: the app performs each step ----------
-    stopDemo() { this.demoStop = true; clearTimeout(this.demoT); clearInterval(this.ghostT); }
-    async runDemo() {
-      this.demoStop = false; this.demoPaused = false;
-      const wait = ms => new Promise(r => { const t0 = performance.now(); const tick = () => { if (this.demoStop) return r(); if (this.demoPaused) { this.demoT = setTimeout(tick, 100); return; } if (performance.now() - t0 >= ms) r(); else this.demoT = setTimeout(tick, 50); }; tick(); });
-      const tween = (id, to, ms) => new Promise(r => { const from = CL.val[id], t0 = performance.now(); const f = () => { if (this.demoStop) return r(); const k = Math.min(1, (performance.now() - t0) / ms); CL.input(id, from + (to - from) * k, 'demo'); if (k < 1) this.demoT = setTimeout(f, 30); else r(); }; f(); });
-      const press = async id => { CL.input(id, true, 'demo'); await wait(160); CL.input(id, false, 'demo'); };
-      const nextBar = async (dn, every) => { const d = deck(dn); if (!d.playing) return; const bi = d.beatIndexAt(d.getPos()); const target = Math.ceil((bi / 4 + 0.1) / Math.min(every, 2)) * Math.min(every, 2) * 4; await wait(Math.max(0, (target - bi) * 60 / d.bpm * 1000 - 20)); };
-      for (let i = 0; i < this.steps.length && !this.demoStop; i++) {
-        this.enter(i); this.demoPhase = 'show'; this.emit();
-        await wait(1700);
-        if (this.demoStop) break;
-        this.demoPhase = 'do'; this.emit();
-        const c = this.steps[i].c;
-        try {
-          switch (c.t) {
-            case 'knob': await tween(c.id, c.to, 1300); break;
-            case 'move': { const v0 = CL.val[c.id]; await tween(c.id, v0 > 0.5 ? 0.05 : 0.95, 900); await tween(c.id, v0, 900); break; }
-            case 'press': await press(c.id); break;
-            case 'playing': if (!deck(c.deck).playing) await press('d' + c.deck + 'play'); break;
-            case 'paused': if (deck(c.deck).playing) await press('d' + c.deck + 'play'); break;
-            case 'sync': if (!deck(c.deck).sync) await press('d' + c.deck + 'sync'); break;
-            case 'cueToggle': if (!!CL.val['hcue' + c.ch + 'On'] !== c.on) await press('hcue' + c.ch); break;
-            case 'onBar': await nextBar(c.deck, c.every); await press(c.id); break;
-            case 'together': await nextBar(c.deck, 1); await Promise.all(c.parts.map(p => tween(p.id, p.to, 500))); break;
-            case 'bpm': { const d = deck(c.deck), o = deck(c.deck === 1 ? 2 : 1); const need = (o.bpm / (d.track.bpm * d.slow) - 1); let v = 0.5 + need / (2 * d.range); if (CL.store.settings.invertTempo) v = 1 - v; await tween('d' + c.deck + 'tempo', CL.clamp(v, 0, 1), 1600); break; }
-            case 'phase': A().matchPhase(deck(c.deck)); break;
-            case 'jogTouch': CL.emit('jog-touch', { id: 'd' + c.deck + 'jog', down: true }); await wait(900); CL.emit('jog-touch', { id: 'd' + c.deck + 'jog', down: false }); break;
-            case 'scratch': case 'scratchTime': case 'scratchCut': {
-              const id = 'd' + c.deck + 'jog'; CL.jogTouch[id] = true; CL.emit('jog-touch', { id, down: true });
-              for (let k = 0; k < 8 && !this.demoStop; k++) { for (let j = 0; j < 6; j++) { CL.input(id, (k % 2 ? -1 : 1) * 12, 'demo', { top: true }); await wait(25); } if (c.t === 'scratchCut') CL.input('xfader', k % 2 ? 0 : 0.6, 'demo'); }
-              CL.jogTouch[id] = false; CL.emit('jog-touch', { id, down: false }); break;
-            }
-            case 'loop': await press(c.on ? (deck(c.deck).loopIn != null ? 'd' + c.deck + 'out' : 'd' + c.deck + 'exit') : 'd' + c.deck + 'exit'); break;
-            case 'loopLen': { const d = deck(c.deck); const cur = d.loop.on ? (d.loop.end - d.loop.start) / d.beatLen : 4; const id = c.beats < cur ? 'callL' : 'callR'; let n = Math.round(Math.abs(Math.log2(c.beats / cur))); while (n-- > 0) { await press('d' + c.deck + id); await wait(300); } break; }
-            case 'hotcue': { const d = deck(c.deck); const free = d.hot.indexOf(null); if (free >= 0) await press('d' + c.deck + 'p' + (free + 1)); break; }
-            case 'hotcueJump': await press('d' + c.deck + 'p1'); break;
-            case 'beatjump': for (let k = 0; k < Math.min(c.count, 3); k++) { await press('d' + c.deck + 'p' + (k + 1)); await wait(500); } break;
-            case 'roll': { const id = 'd' + c.deck + 'p3'; CL.input(id, true, 'demo'); await wait(900); CL.input(id, false, 'demo'); break; }
-            case 'samples': for (let k = 1; k <= 4; k++) { await press('d1p' + k); await wait(350); } break;
-            case 'fx': if (A().fx.on !== c.on) await press('fxon'); break;
-            case 'fxType': for (let k = 0; k < 3 && A().fx.type !== c.type; k++) { await press('fxsel'); await wait(250); } break;
-            case 'fxBeat': await press('fxbR'); break;
-            case 'tempoRange': CL.input('d' + c.deck + 'sync', true, 'demo', { tempoRange: true }); await wait(150); CL.input('d' + c.deck + 'sync', false, 'demo'); break;
-            case 'cut': { const d = deck(c.deck); if (d.playing) await nextBar(c.deck, 1); await tween('xfader', c.to, 120); break; }
-            case 'quiz': this.demoReveal = true; this.emit(); await wait(2600); this.demoReveal = false; break;
-            default: await wait(1800);
-          }
-        } catch (e) { console.warn(e); }
-        this.st.complete = true; this.emit();
-        await wait(1300);
-      }
-      if (!this.demoStop) { this.demoDone = true; this.done = true; this.emit(); }
-    }
+    stopDemo() { if (this.video) this.video.stop(); }
   }
   CL.LessonRun = Run;
 })(window.CL);
