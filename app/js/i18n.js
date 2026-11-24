@@ -90,8 +90,14 @@
   };
   // switching language reloads the window and comes back to Settings
   CL.setLang = function (lang) {
+    const view = CL.currentView ? CL.currentView() : 'settings';
+    const run = CL.currentRun, busy = (view === 'lesson' && run && !run.done && run.i > 0) ||
+      (CL.audio && CL.audio.decks && [1, 2].some(n => CL.audio.decks[n] && CL.audio.decks[n].playing));
+    if (busy && !window.confirm(CL.lang() === 'my'
+      ? 'ဘာသာ ပြောင်းရင် app ပြန်စပြီး သီချင်းနဲ့ လက်ရှိ သင်ခန်းစာ အဆင့် ရပ်သွားပါမယ်။ ဆက်လုပ်မလား။\n\nChanging language restarts the app and stops the music and this lesson step. Continue?'
+      : 'Changing language restarts the app and stops the music and this lesson step. Continue?')) return;
     CL.store.settings.lang = lang; CL.save();
-    try { sessionStorage.setItem('cuelab.after', 'settings'); } catch (e) { }
+    try { sessionStorage.setItem('cuelab.after', view === 'lesson' ? 'lessons' : (view || 'settings')); } catch (e) { }
     location.reload();
   };
 })(window.CL);
